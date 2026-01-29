@@ -15,17 +15,75 @@ export function renameVars(code){
     const map = {}
     const rand = () => "_" + Math.random().toString(36).substring(2,10)
 
-    return code.replace(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g, (word, offset) => {
+    let result = ""
+    let i = 0
+    let inString = false
+    let stringChar = ""
+    let inComment = false
 
-        // 不混淆保留字
-        if (RESERVED.has(word)) return word
+    while (i < code.length) {
+        const c = code[i]
+        const next = code[i+1]
 
-        // 🔥 关键修复：如果前面是 "." 或 ":" 就是字段/方法名，不动
-        const prevChar = code[offset - 1]
-        if (prevChar === "." || prevChar === ":") return word
+        // 进入字符串
+        if (!inComment && (c === '"' || c === "'")) {
+            inString = true
+            stringChar = c
+            result += c
+            i++
+            continue
+        }
 
-        // 正常变量才混淆
-        if (!map[word]) map[word] = rand()
-        return map[word]
-    })
+        // 退出字符串
+        if (inString) {
+            result += c
+            if (c === stringChar && code[i-1] !== "\\") {
+                inString = false
+            }
+            i++
+            continue
+        }
+
+        // 单行注释 --
+        if (!inString && c === "-" && next === "-") {
+            inComment = true
+            result += c
+            i++
+            continue
+        }
+
+        if (inComment) {
+            result += c
+            if (c === "\n") inComment = false
+            i++
+            continue
+        }
+
+        // 识别变量名
+        if (/[a-zA-Z_]/.test(c)) {
+            let start = i
+            while (i < code.length && /[a-zA-Z0-9_]/.test(code[i])) i++
+            const word = code.slice(start, i)
+
+            const prevChar = code[start - 1]
+
+            if (
+                RESERVED.has(word) ||          // 保留字
+                prevChar === "." ||            // 字段
+                prevChar === ":"               // 方法
+            ) {
+                result += word
+            } else {
+                if (!map[word]) map[word] = rand()
+                result += map[word]
+            }
+
+            continue
+        }
+
+        result += c
+        i++
+    }
+
+    return result
 }
