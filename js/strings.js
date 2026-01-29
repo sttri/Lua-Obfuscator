@@ -17,7 +17,7 @@ export function encodeStrings(code){
             local ${keyName} = ${key}
             local ${idxName} = 1
             while ${idxName} <= #${arrName} do
-                ${resName} = ${resName} .. string.char(((${arrName}[${idxName}] + 256) % 256) ~ ${keyName})
+                ${resName} = ${resName} .. string.char(bit32.bxor(${arrName}[${idxName}], ${keyName}))
                 ${idxName} = ${idxName} + 1
             end
             return ${resName}
