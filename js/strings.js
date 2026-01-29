@@ -1,4 +1,3 @@
-// strings.js
 export function encodeStrings(code){
     return code.replace(/(["'])(.*?)\1/g,(m,q,str)=>{
         let arr = []
@@ -18,7 +17,7 @@ export function encodeStrings(code){
             local ${keyName} = ${key}
             local ${idxName} = 1
             while ${idxName} <= #${arrName} do
-                ${resName} = ${resName} .. string.char((${arrName}[${idxName}] + 256) % 256 ~ ${keyName})
+                ${resName} = ${resName} .. string.char(((${arrName}[${idxName}] + 256) % 256) ~ ${keyName})
                 ${idxName} = ${idxName} + 1
             end
             return ${resName}
