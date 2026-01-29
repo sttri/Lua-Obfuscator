@@ -15,9 +15,17 @@ export function renameVars(code){
     const map = {}
     const rand = () => "_" + Math.random().toString(36).substring(2,10)
 
-    return code.replace(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g, w=>{
-        if (RESERVED.has(w)) return w
-        if (!map[w]) map[w] = rand()
-        return map[w]
+    return code.replace(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g, (word, offset) => {
+
+        // 不混淆保留字
+        if (RESERVED.has(word)) return word
+
+        // 🔥 关键修复：如果前面是 "." 或 ":" 就是字段/方法名，不动
+        const prevChar = code[offset - 1]
+        if (prevChar === "." || prevChar === ":") return word
+
+        // 正常变量才混淆
+        if (!map[word]) map[word] = rand()
+        return map[word]
     })
 }
