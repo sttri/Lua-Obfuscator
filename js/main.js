@@ -2,22 +2,24 @@ document.getElementById("run").onclick = function () {
     let code = document.getElementById("input").value;
     if (!code.trim()) return alert("请输入代码");
 
-    // 变量混淆 + 垃圾代码
+    // ✅ 先生成密钥（后面所有加密统一用它）
+    let key = randomKey();
+
+    // ① 变量混淆 + 垃圾代码
     code = generateJunk() + renameLocals(code) + generateJunk();
-    // 字符串加密
+
+    // ② 字符串加密（现在 key 已经存在了）
     code = encryptLuaStrings(code, key);
 
-    // XOR 加密
-    let key = randomKey();
-    let encrypted = xorEncrypt(code, key);
+    // ③ 整体源码 XOR 加密
+    let encryptedB64 = xorEncrypt(code, key); // 你这个函数本身就会 btoa
 
-    let encryptedB64 = b64e(encrypted);
-    let keyB64 = b64e(key);
+    let keyB64 = btoa(key);
 
-    // 第二层 Lua 解密壳
+    // ④ 第二层 Lua 解密壳（你原来的函数）
     let luaStub = buildLuaStub(encryptedB64, keyB64);
 
-    // 第三层外壳
+    // ⑤ 第三层外壳（你原来的）
     let final = `
 local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 local function d(data)
@@ -39,7 +41,7 @@ local function d(data)
     end))
 end
 
-loadstring(d("${b64e(luaStub)}"))()
+loadstring(d("${btoa(luaStub)}"))()
 `;
 
     document.getElementById("output").value = final;
