@@ -1,25 +1,21 @@
+window.addEventListener("DOMContentLoaded", function(){
+
+// ====== 你原来的代码从这里开始 ======
+
 document.getElementById("run").onclick = function () {
     let code = document.getElementById("input").value;
     if (!code.trim()) return alert("请输入代码");
 
-    // ✅ 先生成密钥（后面所有加密统一用它）
     let key = randomKey();
 
-    // ① 变量混淆 + 垃圾代码
     code = generateJunk() + renameLocals(code) + generateJunk();
-
-    // ② 字符串加密（现在 key 已经存在了）
     code = encryptLuaStrings(code, key);
 
-    // ③ 整体源码 XOR 加密
-    let encryptedB64 = xorEncrypt(code, key); // 你这个函数本身就会 btoa
-
+    let encryptedB64 = xorEncrypt(code, key);
     let keyB64 = btoa(key);
 
-    // ④ 第二层 Lua 解密壳（你原来的函数）
     let luaStub = buildLuaStub(encryptedB64, keyB64);
 
-    // ⑤ 第三层外壳（你原来的）
     let final = `
 local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 local function d(data)
@@ -46,3 +42,7 @@ loadstring(d("${btoa(luaStub)}"))()
 
     document.getElementById("output").value = final;
 };
+
+// ====== 你原来的代码到这里结束 ======
+
+});
