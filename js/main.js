@@ -2,13 +2,10 @@ document.getElementById("run").onclick = function () {
     let code = document.getElementById("input").value;
     if (!code.trim()) return alert("请输入代码");
 
-    // ① 变量混淆 + 垃圾代码
+    // 变量混淆 + 垃圾代码
     code = generateJunk() + renameLocals(code) + generateJunk();
 
-    // ② 控制流扁平化
-    code = flattenControlFlow(code);
-
-    // ③ XOR 加密
+    // XOR 加密
     let key = randomKey();
     let encrypted = xorEncrypt(code, key);
 
