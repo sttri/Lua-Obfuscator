@@ -4,6 +4,8 @@ document.getElementById("run").onclick = function () {
 
     // 变量混淆 + 垃圾代码
     code = generateJunk() + renameLocals(code) + generateJunk();
+    // 字符串加密
+    code = encryptLuaStrings(code, key);
 
     // XOR 加密
     let key = randomKey();
