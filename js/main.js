@@ -1,7 +1,11 @@
-// main.js
 document.getElementById("run").onclick = function () {
     let code = document.getElementById("input").value;
     if (!code.trim()) return alert("请输入代码");
+
+    const frontJunk = generateMassiveJunkLines(300);
+    const backJunk = generateMassiveJunkLines(300);
+
+    code = frontJunk + code + backJunk;
 
     code = generateJunk() + renameLocals(code) + generateJunk();
     let key = randomKey();
@@ -98,5 +102,9 @@ local realStub = xorDecrypt(stubEnc, stubKey)
 loadstring(realStub)()
 `;
 
-    document.getElementById("output").value = final;
+    const finalFrontJunk = generateMassiveJunkLines(200);
+    const finalBackJunk = generateMassiveJunkLines(200);
+    let finalWithJunk = finalFrontJunk + final + finalBackJunk;
+
+    document.getElementById("output").value = finalWithJunk;
 };
