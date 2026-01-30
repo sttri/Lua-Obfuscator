@@ -1,24 +1,24 @@
-document.getElementById("run").onclick=function(){
-    let code=document.getElementById("input").value;
-    if(!code.trim()) return alert("请输入代码");
+document.getElementById("run").onclick = function () {
+    let code = document.getElementById("input").value;
+    if (!code.trim()) return alert("请输入代码");
 
     // ① 变量混淆 + 垃圾代码
     code = generateJunk() + renameLocals(code) + generateJunk();
 
-    // ② 控制流扁平化（新增）
+    // ② 控制流扁平化
     code = flattenControlFlow(code);
 
-    // ③ XOR 加密源码
+    // ③ XOR 加密
     let key = randomKey();
-    let encrypted = xorEncrypt(code,key);
+    let encrypted = xorEncrypt(code, key);
 
     let encryptedB64 = b64e(encrypted);
     let keyB64 = b64e(key);
 
-    // ④ 第二层 Lua 解密壳
-    let luaStub = buildLuaStub(encryptedB64,keyB64);
+    // 第二层 Lua 解密壳
+    let luaStub = buildLuaStub(encryptedB64, keyB64);
 
-    // ⑤ 第三层：解密壳再 Base64 包裹
+    // 第三层外壳
     let final = `
 local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 local function d(data)
@@ -42,3 +42,6 @@ end
 
 loadstring(d("${b64e(luaStub)}"))()
 `;
+
+    document.getElementById("output").value = final;
+};
