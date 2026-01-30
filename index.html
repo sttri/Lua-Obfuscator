@@ -2,22 +2,21 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Luau Extreme Obfuscator</title>
+<title>Roblox Lua Obfuscator</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h1>Luau / Roblox Obfuscator (Extreme)</h1>
+<h1>Roblox Lua Obfuscator (3 Layer)</h1>
 
-<textarea id="input" placeholder="Paste Lua/Luau code here..."></textarea>
+<textarea id="input" placeholder="输入Lua源码..."></textarea>
+<button id="run">开始混淆</button>
+<textarea id="output" placeholder="混淆结果..."></textarea>
 
-<div class="controls">
-  <button onclick="runObfuscation()">OBFUSCATE</button>
-  <button onclick="copyOut()">COPY</button>
-</div>
-
-<textarea id="output" placeholder="Obfuscated code..."></textarea>
-
-<script type="module" src="js/main.js"></script>
+<script src="js/junk.js"></script>
+<script src="js/obfuscator.js"></script>
+<script src="js/crypto.js"></script>
+<script src="js/encoder.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>
