@@ -1,21 +1,21 @@
-window.addEventListener("DOMContentLoaded", function(){
-
-// ====== 你原来的代码从这里开始 ======
-
 document.getElementById("run").onclick = function () {
     let code = document.getElementById("input").value;
     if (!code.trim()) return alert("请输入代码");
 
-    let key = randomKey();
-
+    // 变量混淆 + 垃圾代码
     code = generateJunk() + renameLocals(code) + generateJunk();
-    code = encryptLuaStrings(code, key);
 
-    let encryptedB64 = xorEncrypt(code, key);
-    let keyB64 = btoa(key);
+    // XOR 加密
+    let key = randomKey();
+    let encrypted = xorEncrypt(code, key);
 
+    let encryptedB64 = b64e(encrypted);
+    let keyB64 = b64e(key);
+
+    // 第二层 Lua 解密壳
     let luaStub = buildLuaStub(encryptedB64, keyB64);
 
+    // 第三层外壳
     let final = `
 local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 local function d(data)
@@ -37,12 +37,8 @@ local function d(data)
     end))
 end
 
-loadstring(d("${btoa(luaStub)}"))()
+loadstring(d("${b64e(luaStub)}"))()
 `;
 
     document.getElementById("output").value = final;
 };
-
-// ====== 你原来的代码到这里结束 ======
-
-});
