@@ -2,20 +2,23 @@ document.getElementById("run").onclick=function(){
     let code=document.getElementById("input").value;
     if(!code.trim()) return alert("请输入代码");
 
-    // 第一层：源码混淆
+    // ① 变量混淆 + 垃圾代码
     code = generateJunk() + renameLocals(code) + generateJunk();
 
-    // 第二层：XOR 加密
+    // ② 控制流扁平化（新增）
+    code = flattenControlFlow(code);
+
+    // ③ XOR 加密源码
     let key = randomKey();
     let encrypted = xorEncrypt(code,key);
 
     let encryptedB64 = b64e(encrypted);
     let keyB64 = b64e(key);
 
-    // 第二层 Lua 解密壳
+    // ④ 第二层 Lua 解密壳
     let luaStub = buildLuaStub(encryptedB64,keyB64);
 
-    // 第三层：把“解密壳”再 Base64 包裹
+    // ⑤ 第三层：解密壳再 Base64 包裹
     let final = `
 local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 local function d(data)
