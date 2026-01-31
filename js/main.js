@@ -2,207 +2,193 @@ document.getElementById("run").onclick = function () {
     let code = document.getElementById("input").value;
     if (!code.trim()) return alert("请输入代码");
 
-    // 1. 保护字符串内容
-    const stringRegex = /(["'])(?:\\.|(?!\1).)*?\1/g;
-    const strings = [];
-    let protectedCode = code.replace(stringRegex, (match) => {
-        strings.push(match);
-        return `__STRING_${strings.length - 1}__`;
-    });
-
-    // 2. 保护 URL（特别处理 http/https）
-    const urlRegex = /https?:\/\/[^\s"'<>{}[\]()]+/g;
-    const urls = [];
-    protectedCode = protectedCode.replace(urlRegex, (match) => {
-        urls.push(match);
-        return `__URL_${urls.length - 1}__`;
-    });
-
-    // 3. 保护函数调用中的点表示法
-    const dotNotationRegex = /\b([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)/g;
-    const dotNotations = [];
-    protectedCode = protectedCode.replace(dotNotationRegex, (match) => {
-        dotNotations.push(match);
-        return `__DOT_${dotNotations.length - 1}__`;
-    });
-
-    // 4. 应用重命名混淆
-    let renamedCode = renameLocals(protectedCode);
+    console.log("开始混淆处理...");
     
-    // 5. 恢复被保护的内容（按相反顺序）
-    for (let i = dotNotations.length - 1; i >= 0; i--) {
-        renamedCode = renamedCode.replace(`__DOT_${i}__`, dotNotations[i]);
-    }
-    for (let i = strings.length - 1; i >= 0; i--) {
-        renamedCode = renamedCode.replace(`__STRING_${i}__`, strings[i]);
-    }
-    for (let i = urls.length - 1; i >= 0; i--) {
-        renamedCode = renamedCode.replace(`__URL_${i}__`, urls[i]);
-    }
-
-    // 6. 添加反调试和垃圾代码
+    // 1. 先进行重命名
+    let renamedCode = renameLocals(code);
+    console.log("重命名完成");
+    
+    // 2. 添加反调试和垃圾代码
     let antiDebug = `
-local function checkDebug()
-    local time1 = tick()
-    for i = 1, 100 do
-        local _ = math.random(1, 1000)
-    end
-    local time2 = tick()
-    if time2 - time1 > 0.01 then
-        return true
-    end
-    return false
+-- 反调试保护
+local _anti_debug_start = tick()
+local _anti_debug_sum = 0
+for _anti_debug_i = 1, 50 do
+    _anti_debug_sum = _anti_debug_sum + math.random(1, 1000)
 end
-if checkDebug() then
+local _anti_debug_elapsed = tick() - _anti_debug_start
+if _anti_debug_elapsed > 0.1 then
     return
 end
+
+-- 垃圾代码
+local _junk_func_${Math.random().toString(36).slice(2, 8)} = function()
+    local _junk_var_${Math.random().toString(36).slice(2, 8)} = ${Math.floor(Math.random() * 99999)}
+    return _junk_var_${Math.random().toString(36).slice(2, 8)} * 0
+end
+_junk_func_${Math.random().toString(36).slice(2, 8)}()
 `;
 
-    // 7. 组合最终代码
-    code = antiDebug + generateJunk() + renamedCode + generateJunk();
-
-    // 8. 分块处理（最多5个分块）
-    let chunkSize = Math.max(1000, Math.ceil(code.length / 5));
+    // 3. 组合代码
+    let finalCode = antiDebug + renamedCode;
+    
+    // 4. 分块处理（最多3块）
+    const MAX_CHUNKS = 3;
     let chunks = [];
-    for (let i = 0; i < code.length; i += chunkSize) {
-        chunks.push(code.substring(i, Math.min(i + chunkSize, code.length)));
-    }
-
-    // 确保不超过5个分块
-    if (chunks.length > 5) {
-        chunkSize = Math.ceil(code.length / 5);
-        chunks = [];
-        for (let i = 0; i < code.length; i += chunkSize) {
-            chunks.push(code.substring(i, Math.min(i + chunkSize, code.length)));
+    
+    if (finalCode.length <= 5000) {
+        // 小代码不分块
+        chunks = [finalCode];
+    } else {
+        // 智能分块：按行分块，不在表达式中间切割
+        const lines = finalCode.split('\n');
+        const linesPerChunk = Math.ceil(lines.length / MAX_CHUNKS);
+        
+        for (let i = 0; i < lines.length; i += linesPerChunk) {
+            const chunkLines = lines.slice(i, Math.min(i + linesPerChunk, lines.length));
+            chunks.push(chunkLines.join('\n'));
         }
     }
-
-    // 9. 加密每个分块
+    
+    console.log(`分块数量: ${chunks.length}`);
+    
+    // 5. 加密每个分块
     let chunkKeys = [];
     let encryptedChunks = [];
     
-    for (let i = 0; i < chunks.length; i++) {
-        let chunkKey = randomKey();
-        chunkKeys.push(chunkKey);
-        let encrypted = xorEncrypt(chunks[i], chunkKey);
+    for (let chunk of chunks) {
+        let key = randomKey(24);
+        chunkKeys.push(key);
+        let encrypted = xorEncrypt(chunk, key);
         encryptedChunks.push(b64e(encrypted));
     }
+    
+    // 6. 生成解密器
+    let decryptor = `
+-- 加密混淆代码（${chunks.length}个分块）
+local _b64_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+local _b64_map = {}
+for i = 1, 64 do _b64_map[_b64_chars:sub(i, i)] = i - 1 end
 
-    let chunkKeysB64 = chunkKeys.map(k => b64e(k));
-    let chunkDataB64 = encryptedChunks;
+local function _b64_decode(s)
+    s = string.gsub(s, '[^' .. _b64_chars .. '=]', '')
+    local result = {}
+    local bits = 0
+    local bit_count = 0
+    
+    for i = 1, #s do
+        local c = s:sub(i, i)
+        if c == '=' then break end
+        bits = bits * 64 + (_b64_map[c] or 0)
+        bit_count = bit_count + 6
+        
+        if bit_count >= 8 then
+            bit_count = bit_count - 8
+            local byte = math.floor(bits / (2 ^ bit_count)) % 256
+            table.insert(result, string.char(byte))
+        end
+    end
+    return table.concat(result)
+end
 
-    // 10. 生成分块加载器（Luau语法）
-    let chunkLoader = "local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'\n" +
-"local t={}\n" +
-"for i=1,#b do t[b:sub(i,i)]=i-1 end\n" +
-"\n" +
-"local function d(s)\n" +
-"    s=string.gsub(s,'[^'..b..'=]','')\n" +
-"    local bits=''\n" +
-"    for i=1,#s do\n" +
-"        local c=s:sub(i,i)\n" +
-"        if c=='=' then break end\n" +
-"        local v=t[c] or 0\n" +
-"        bits=bits..(bit32.band(bit32.rshift(v,5),1))\n" +
-"        bits=bits..(bit32.band(bit32.rshift(v,4),1))\n" +
-"        bits=bits..(bit32.band(bit32.rshift(v,3),1))\n" +
-"        bits=bits..(bit32.band(bit32.rshift(v,2),1))\n" +
-"        bits=bits..(bit32.band(bit32.rshift(v,1),1))\n" +
-"        bits=bits..(bit32.band(v,1))\n" +
-"    end\n" +
-"    local bytes=''\n" +
-"    for i=1,#bits,8 do\n" +
-"        local b8=bits:sub(i,i+7)\n" +
-"        if #b8==8 then\n" +
-"            local n=0\n" +
-"            n=n+(b8:sub(1,1)=='1' and 128 or 0)\n" +
-"            n=n+(b8:sub(2,2)=='1' and 64 or 0)\n" +
-"            n=n+(b8:sub(3,3)=='1' and 32 or 0)\n" +
-"            n=n+(b8:sub(4,4)=='1' and 16 or 0)\n" +
-"            n=n+(b8:sub(5,5)=='1' and 8 or 0)\n" +
-"            n=n+(b8:sub(6,6)=='1' and 4 or 0)\n" +
-"            n=n+(b8:sub(7,7)=='1' and 2 or 0)\n" +
-"            n=n+(b8:sub(8,8)=='1' and 1 or 0)\n" +
-"            bytes=bytes..string.char(n)\n" +
-"        end\n" +
-"    end\n" +
-"    return bytes\n" +
-"end\n" +
-"\n" +
-"local function x(d,k)\n" +
-"    local o=''\n" +
-"    for i=1,#d do\n" +
-"        o=o..string.char(bit32.bxor(d:byte(i),k:byte((i-1)%#k+1)))\n" +
-"    end\n" +
-"    return o\n" +
-"end\n" +
-"\n" +
-"local fullCode=''\n";
+local function _xor_decrypt(data, key)
+    local result = {}
+    local key_len = #key
+    for i = 1, #data do
+        local data_byte = data:byte(i)
+        local key_byte = key:byte((i - 1) % key_len + 1)
+        table.insert(result, string.char(bit32.bxor(data_byte, key_byte)))
+    end
+    return table.concat(result)
+end
 
-    // 11. 添加分块解密代码
-    for (let i = 0; i < chunkKeysB64.length; i++) {
-        chunkLoader += 
-"fullCode=fullCode..x(d('" + chunkDataB64[i] + "'),d('" + chunkKeysB64[i] + "'))\n";
+-- 分块数据
+local _chunks = {}
+`;
+
+    // 添加分块解密代码
+    for (let i = 0; i < chunks.length; i++) {
+        decryptor += `
+-- 分块 ${i + 1}
+do
+    local _enc_data_${i} = [[${encryptedChunks[i]}]]
+    local _enc_key_${i} = [[${b64e(chunkKeys[i])}]]
+    local _data_${i} = _b64_decode(_enc_data_${i})
+    local _key_${i} = _b64_decode(_enc_key_${i})
+    _chunks[${i + 1}] = _xor_decrypt(_data_${i}, _key_${i})
+end
+`;
     }
+    
+    decryptor += `
+-- 合并并执行
+local _full_code = table.concat(_chunks)
+local _success, _error = pcall(function()
+    loadstring(_full_code)()
+end)
 
-    chunkLoader += "loadstring(fullCode)()";
+if not _success then
+    warn('执行错误:', _error)
+end
+`;
 
-    // 12. 最终加密层
-    let key = randomKey(16);
-    let encrypted = xorEncrypt(chunkLoader, key);
-    let encryptedB64 = b64e(encrypted);
-    let keyB64 = b64e(key);
+    // 7. 最终加密层
+    let finalKey = randomKey(32);
+    let finalEncrypted = xorEncrypt(decryptor, finalKey);
+    let finalEncryptedB64 = b64e(finalEncrypted);
+    let finalKeyB64 = b64e(finalKey);
+    
+    // 8. 生成最终输出
+    let finalOutput = `
+-- 最终加密层
+local _final_b64_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+local _final_b64_map = {}
+for _final_i = 1, 64 do _final_b64_map[_final_b64_chars:sub(_final_i, _final_i)] = _final_i - 1 end
 
-    // 13. 生成最终输出（Luau兼容）
-    let final = 
-"local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'\n" +
-"local t={}\n" +
-"for i=1,#b do t[b:sub(i,i)]=i-1 end\n" +
-"\n" +
-"local function d(s)\n" +
-"    s=string.gsub(s,'[^'..b..'=]','')\n" +
-"    local bits=''\n" +
-"    for i=1,#s do\n" +
-"        local c=s:sub(i,i)\n" +
-"        if c=='=' then break end\n" +
-"        local v=t[c] or 0\n" +
-"        bits=bits..(bit32.band(bit32.rshift(v,5),1))\n" +
-"        bits=bits..(bit32.band(bit32.rshift(v,4),1))\n" +
-"        bits=bits..(bit32.band(bit32.rshift(v,3),1))\n" +
-"        bits=bits..(bit32.band(bit32.rshift(v,2),1))\n" +
-"        bits=bits..(bit32.band(bit32.rshift(v,1),1))\n" +
-"        bits=bits..(bit32.band(v,1))\n" +
-"    end\n" +
-"    local bytes=''\n" +
-"    for i=1,#bits,8 do\n" +
-"        local b8=bits:sub(i,i+7)\n" +
-"        if #b8==8 then\n" +
-"            local n=0\n" +
-"            n=n+(b8:sub(1,1)=='1' and 128 or 0)\n" +
-"            n=n+(b8:sub(2,2)=='1' and 64 or 0)\n" +
-"            n=n+(b8:sub(3,3)=='1' and 32 or 0)\n" +
-"            n=n+(b8:sub(4,4)=='1' and 16 or 0)\n" +
-"            n=n+(b8:sub(5,5)=='1' and 8 or 0)\n" +
-"            n=n+(b8:sub(6,6)=='1' and 4 or 0)\n" +
-"            n=n+(b8:sub(7,7)=='1' and 2 or 0)\n" +
-"            n=n+(b8:sub(8,8)=='1' and 1 or 0)\n" +
-"            bytes=bytes..string.char(n)\n" +
-"        end\n" +
-"    end\n" +
-"    return bytes\n" +
-"end\n" +
-"\n" +
-"local function x(d,k)\n" +
-"    local o=''\n" +
-"    for i=1,#d do\n" +
-"        o=o..string.char(bit32.bxor(d:byte(i),k:byte((i-1)%#k+1)))\n" +
-"    end\n" +
-"    return o\n" +
-"end\n" +
-"\n" +
-"local k=d('" + keyB64 + "')\n" +
-"local data=d('" + encryptedB64 + "')\n" +
-"loadstring(x(data,k))()";
+local function _final_b64_decode(s)
+    s = string.gsub(s, '[^' .. _final_b64_chars .. '=]', '')
+    local _final_result = {}
+    local _final_bits = 0
+    local _final_bit_count = 0
+    
+    for _final_i = 1, #s do
+        local _final_c = s:sub(_final_i, _final_i)
+        if _final_c == '=' then break end
+        _final_bits = _final_bits * 64 + (_final_b64_map[_final_c] or 0)
+        _final_bit_count = _final_bit_count + 6
+        
+        if _final_bit_count >= 8 then
+            _final_bit_count = _final_bit_count - 8
+            local _final_byte = math.floor(_final_bits / (2 ^ _final_bit_count)) % 256
+            table.insert(_final_result, string.char(_final_byte))
+        end
+    end
+    return table.concat(_final_result)
+end
 
-    document.getElementById("output").value = final;
+local _final_enc_data = [[${finalEncryptedB64}]]
+local _final_enc_key = [[${finalKeyB64}]]
+
+local _final_data = _final_b64_decode(_final_enc_data)
+local _final_key = _final_b64_decode(_final_enc_key)
+
+local _final_decrypted = ''
+for _final_i = 1, #_final_data do
+    local _final_data_byte = _final_data:byte(_final_i)
+    local _final_key_byte = _final_key:byte((_final_i - 1) % #_final_key + 1)
+    _final_decrypted = _final_decrypted .. string.char(bit32.bxor(_final_data_byte, _final_key_byte))
+end
+
+-- 执行解密后的代码
+local _final_success, _final_error = pcall(function()
+    loadstring(_final_decrypted)()
+end)
+
+if not _final_success then
+    warn('最终执行错误:', _final_error)
+end
+`;
+
+    document.getElementById("output").value = finalOutput;
+    console.log("混淆完成，输出已生成");
 };
