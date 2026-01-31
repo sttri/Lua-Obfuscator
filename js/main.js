@@ -2,15 +2,53 @@ document.getElementById("run").onclick = function () {
     let code = document.getElementById("input").value;
     if (!code.trim()) return alert("请输入代码");
 
-    // 轻量反调试
+    // 1. 保护字符串内容
+    const stringRegex = /(["'])(?:\\.|(?!\1).)*?\1/g;
+    const strings = [];
+    let protectedCode = code.replace(stringRegex, (match) => {
+        strings.push(match);
+        return `__STRING_${strings.length - 1}__`;
+    });
+
+    // 2. 保护 URL（特别处理 http/https）
+    const urlRegex = /https?:\/\/[^\s"'<>{}[\]()]+/g;
+    const urls = [];
+    protectedCode = protectedCode.replace(urlRegex, (match) => {
+        urls.push(match);
+        return `__URL_${urls.length - 1}__`;
+    });
+
+    // 3. 保护函数调用中的点表示法
+    const dotNotationRegex = /\b([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)/g;
+    const dotNotations = [];
+    protectedCode = protectedCode.replace(dotNotationRegex, (match) => {
+        dotNotations.push(match);
+        return `__DOT_${dotNotations.length - 1}__`;
+    });
+
+    // 4. 应用重命名混淆
+    let renamedCode = renameLocals(protectedCode);
+    
+    // 5. 恢复被保护的内容（按相反顺序）
+    for (let i = dotNotations.length - 1; i >= 0; i--) {
+        renamedCode = renamedCode.replace(`__DOT_${i}__`, dotNotations[i]);
+    }
+    for (let i = strings.length - 1; i >= 0; i--) {
+        renamedCode = renamedCode.replace(`__STRING_${i}__`, strings[i]);
+    }
+    for (let i = urls.length - 1; i >= 0; i--) {
+        renamedCode = renamedCode.replace(`__URL_${i}__`, urls[i]);
+    }
+
+    // 6. 添加反调试和垃圾代码
     let antiDebug = `
 local function checkDebug()
     local time1 = tick()
     for i = 1, 100 do
-        local _ = i
+        local _ = math.random(1, 1000)
     end
     local time2 = tick()
-    if time2 - time1 > 0.1 then
+    if time2 - time1 > 0.01 then
         return true
     end
     return false
@@ -20,17 +58,17 @@ if checkDebug() then
 end
 `;
 
-    // 原始代码处理
-    code = antiDebug + generateJunk() + renameLocals(code) + generateJunk();
+    // 7. 组合最终代码
+    code = antiDebug + generateJunk() + renamedCode + generateJunk();
 
-    // 代码分块加密（限制分块数量）
+    // 8. 分块处理（最多5个分块）
     let chunkSize = Math.max(1000, Math.ceil(code.length / 5));
     let chunks = [];
     for (let i = 0; i < code.length; i += chunkSize) {
         chunks.push(code.substring(i, Math.min(i + chunkSize, code.length)));
     }
 
-    // 最多5个分块
+    // 确保不超过5个分块
     if (chunks.length > 5) {
         chunkSize = Math.ceil(code.length / 5);
         chunks = [];
@@ -39,6 +77,7 @@ end
         }
     }
 
+    // 9. 加密每个分块
     let chunkKeys = [];
     let encryptedChunks = [];
     
@@ -52,7 +91,7 @@ end
     let chunkKeysB64 = chunkKeys.map(k => b64e(k));
     let chunkDataB64 = encryptedChunks;
 
-    // 简化分块加载器
+    // 10. 生成分块加载器（Luau语法）
     let chunkLoader = "local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'\n" +
 "local t={}\n" +
 "for i=1,#b do t[b:sub(i,i)]=i-1 end\n" +
@@ -100,7 +139,7 @@ end
 "\n" +
 "local fullCode=''\n";
 
-    // 直接解密所有分块
+    // 11. 添加分块解密代码
     for (let i = 0; i < chunkKeysB64.length; i++) {
         chunkLoader += 
 "fullCode=fullCode..x(d('" + chunkDataB64[i] + "'),d('" + chunkKeysB64[i] + "'))\n";
@@ -108,13 +147,13 @@ end
 
     chunkLoader += "loadstring(fullCode)()";
 
-    // 单层加密
+    // 12. 最终加密层
     let key = randomKey(16);
     let encrypted = xorEncrypt(chunkLoader, key);
     let encryptedB64 = b64e(encrypted);
     let keyB64 = b64e(key);
 
-    // 最终输出
+    // 13. 生成最终输出（Luau兼容）
     let final = 
 "local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'\n" +
 "local t={}\n" +
